@@ -93,8 +93,8 @@ else:
 if args.verbosity or args.verbosity2:
 	PrintBoard(board)
 
-board = solve(board, args.verbosity2)
-PrintBoard()
+# board = solve(board, args.verbosity2)
+# PrintBoard()
 
 
 
