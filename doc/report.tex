@@ -1,0 +1,122 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[top=2.5cm,bottom=2cm,left=2cm,right=2cm]{geometry} 
+\usepackage[brazil]{babel}
+\usepackage{blindtext}
+\usepackage{ragged2e}
+\usepackage{soul}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{mathtools}
+\usepackage{systeme}
+\setlength\parindent{24pt}
+
+% Used for code
+\usepackage{mdframed}
+\usepackage{listings}
+\usepackage{xparse}
+\usepackage{xcolor}
+\usepackage{minted}
+\setminted{fontsize=\small,baselinestretch=1}
+\definecolor{lightgrey}{rgb}{0.95,0.95,0.95}
+
+% Define global minted behaviour for C code
+\newmintedfile[ccode]{c}{
+    mathescape,
+    bgcolor=lightgrey,
+    fontfamily=courier,
+    numbersep=5pt,
+    gobble=0,
+    funcnamehighlighting=true,
+    numberblanklines=true,
+    linenos=true,
+}
+% \usemintedstyle{monokai}
+
+%capa
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{setspace} % espaçamento
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{array}
+
+\newcommand{\university}{Universidade de São Paulo - ICMC}
+\newcommand{\discipline}{SCC0530 - Inteligência Artificial}
+\newcommand{\data}{$1^o$ semestre / 2018}
+\newcommand{\teacher}{Prof. Solange Oliveira Rezende}
+\newcommand{\PAE}{PAEs: Felipe Provezano Coutinho }
+\newcommand{\specification}{N Sliding Puzzle}
+
+\newcommand{\members}{
+    \begin{table}[!ht]
+        \centering
+        \begin{tabular}{ll}
+            \large\textsc{Gabriel Simmel Nascimento} & \large\textsc{Nº USP: 9050232} \\
+            \large\textsc{Giovanna Oliveira Guimarães} & \large\textsc{Nº USP: 9293693} \\
+            \large\textsc{José Augusto Noronha de Menezes Neto} & \large\textsc{Nº USP: 9293049} \\
+            \large\textsc{Julia Diniz Ferreira} & \large\textsc{Nº USP: 9364865} \\
+            \large\textsc{Lucas Alexandre Soares} & \large\textsc{Nº USP: 9293265} \\
+            \large\textsc{Otávio Luis Aguiar} & \large\textsc{Nº USP: 9293518} \\
+            \large\textsc{Rafael Augusto Monteiro} & \large\textsc{Nº USP: 9293095} \\
+        \end{tabular}
+    \end{table}{}
+}
+
+\newcommand{\capaicmc}{
+    \begin{center}
+        \begin{center}
+            \begin{table}[!ht]
+                \centering 
+                \begin{tabular}{cl}
+                    \multirow{4}{*}{\includegraphics[height=1.8cm,keepaspectratio=true]{logo-header.png}}
+                    & \university\\
+                    %& \course\\ 
+                    & \discipline\\
+                    & \teacher\\
+                    %& \PAE\\
+                \end{tabular}
+            \end{table}
+        \end{center}
+        
+        \vfill
+        
+        {\huge \specification}
+        
+        \vfill
+        
+        \doublespacing
+        \large\textsc{\members}
+        
+        \vfill
+        
+        \large São Carlos - SP \\
+        \large \today \\
+
+        \end{center}
+        
+        \newpage
+}
+
+\begin{document}
+
+% Capa
+\capaicmc
+
+\tableofcontents
+\newpage
+
+% Seta espaçamento entre linhas
+\singlespacing
+
+% começa finalmente 
+% Aqui explica como este documento está estruturado e por que ele está assim, qual o motivo de usarmos este doc
+
+%Explicação do problema e do método numérico
+\section{Introdução}
+    \blindtext
+
+\end{document}
+
