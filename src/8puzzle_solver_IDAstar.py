@@ -10,12 +10,18 @@ import argparse
 # Prepare program arguments
 parser = argparse.ArgumentParser()
 
+''' Arguments:
+	FILENAME 	name of the file to read the input from
+	VERBOSITY 	show some more info
+	FILENAME 	name of the file to read the input from
+'''
+
 parser.add_argument("-f", "--filename", help="File with input board")
 parser.add_argument("-v", "--verbosity", 
-	help="Verbosity level 1 (print initial)",
+	help="Verbosity level 1 (print initial board)",
 	action="store_true")
 parser.add_argument("-vv", "--verbosity2", 
-	help="Verbosity level 2 (print board after each movement)",
+	help="Verbosity level 2 (implies -v; print board after each movement)",
 	action="store_true")
 
 args = parser.parse_args()
@@ -36,6 +42,7 @@ def SolveAStar(board, heuristic, verbosity):
 
 # Create globals
 board = []
+objective = []
 movements = {
 	"up": (-1, 0), 
 	"down": (1, 0), 
@@ -82,7 +89,7 @@ else:
 
 	size = input("Board size: ")
 
-	for i in range(0, 3):
+	for i in range(0, len(lines)):
 		line = str(input("Enter board " + str(i) + " row: "))
 	
 		# Split line by spaces and create an array with all digit values
@@ -100,9 +107,9 @@ else:
 if args.verbosity or args.verbosity2:
 	PrintBoard(board)
 
-# board = SolveAStar(board, ManhattanDistance, args.verbosity2)
+# board = SolveIDAStar(board, ManhattanDistance, args.verbosity2)
 # PrintBoard()
-
+# print("Execution time: " + time)
 
 
 

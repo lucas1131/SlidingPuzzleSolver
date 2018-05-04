@@ -10,12 +10,18 @@ import argparse
 # Prepare program arguments
 parser = argparse.ArgumentParser()
 
+''' Arguments:
+	FILENAME 	name of the file to read the input from
+	VERBOSITY 	show some more info
+	FILENAME 	name of the file to read the input from
+'''
+
 parser.add_argument("-f", "--filename", help="File with input board")
 parser.add_argument("-v", "--verbosity", 
-	help="Verbosity level 1 (print initial)",
+	help="Verbosity level 1 (print initial board)",
 	action="store_true")
 parser.add_argument("-vv", "--verbosity2", 
-	help="Verbosity level 2 (print board after each movement)",
+	help="Verbosity level 2 (implies -v; print board after each movement)",
 	action="store_true")
 
 args = parser.parse_args()
@@ -26,8 +32,24 @@ def PrintBoard(board):
 	for row in board:
 		print("\t" + str(row))
 
+def SwapTiles(board, tile1, tile2):
+	''' SwapTiles
+
+		board: the board's matrix to swap values
+		tile1: a tuple with the coordinates of the first value
+		tile12: a tuple with the coordinates of the second value
+
+		Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
+	'''
+	pass
+
 # Possible heuristics: Hamming distance, Manhattan Distance
 def ManhattanDistance(board):
+	''' ManhattanDistance
+
+		Calculates the Manhattan distance from the current board to the solved
+		board state
+	'''
 	pass
 
 def SolveAStar(board, heuristic, verbosity):
@@ -36,6 +58,7 @@ def SolveAStar(board, heuristic, verbosity):
 
 # Create globals
 board = []
+objective = []
 movements = {
 	"up": (-1, 0), 
 	"down": (1, 0), 
@@ -82,11 +105,12 @@ else:
 
 	size = input("Board size: ")
 
-	for i in range(0, 3):
+	for i in range(0, len(lines)):
 		line = str(input("Enter board " + str(i) + " row: "))
 	
 		# Split line by spaces and create an array with all digit values
 		board.append([int(s) for s in line.split() if s.isdigit()])
+		objective.append([1, 2, 3])
 
 	# print("Board size: " + str(size))
 
@@ -100,8 +124,9 @@ else:
 if args.verbosity or args.verbosity2:
 	PrintBoard(board)
 
-# board = SolveIDAStar(board, ManhattanDistance, args.verbosity2)
+# board = SolveAStar(board, ManhattanDistance, args.verbosity2)
 # PrintBoard()
+# print("Execution time: " + time)
 
 
 
