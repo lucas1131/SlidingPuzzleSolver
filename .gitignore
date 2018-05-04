@@ -100,5 +100,13 @@ ENV/
 # mypy
 .mypy_cache/
 
+# Latex files
+*.aux
+*.fdb*
+*.fls
+*.log
+*.toc
+
 # Custom
 trab-aa-joegs-cartaz/
+
