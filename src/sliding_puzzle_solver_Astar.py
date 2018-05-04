@@ -1,11 +1,24 @@
-import argparse
+#!/usr/bin/python
+# coding=utf8
+# Encoding declared to support python2
 
-''' Python n² sliding puzzle solver 
+# Gabriel Simmel Nascimento             9050232
+# Giovanna Oliveira Guimarães           9293693
+# José Augusto Noronha de Menezes Neto  9293049
+# Julia Diniz Ferreira                  9364865
+# Lucas Alexandre Soares                9293265
+# Otávio Luis Aguiar                    9293518
+# Rafael Augusto Monteiro               9293095
+
+''' Python n² sliding puzzle solver using A*
 
 	For board creation, the value 0 is considered to be the empty space
 	the board will have size n^2
 
 '''
+
+import argparse
+import time
 
 # Prepare program arguments
 parser = argparse.ArgumentParser()
@@ -28,12 +41,48 @@ args = parser.parse_args()
 
 # Define functions
 def PrintBoard(board):
-	print("\nBoard:")
 	for row in board:
 		print("\t" + str(row))
 
+def SwapTiles(board, tile1, tile2):
+	''' SwapTiles
+
+		board: the board's matrix to swap values
+		tile1: a tuple with the coordinates of the first value
+		tile12: a tuple with the coordinates of the second value
+
+		Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
+	'''
+
+	# Swap values
+	tmp = board[tile1[0]][tile1[1]]
+	board[tile1[0]][tile1[1]] = board[tile2[0]][tile2[1]]
+	board[tile2[0]][tile2[1]] = tmp
+
+def GenerateObjective(n):
+
+	board = []
+	count = 0
+	
+	for i in range(0, size):
+
+		row = []
+		for j in range(0, size):
+			count += 1
+			row.append(count)
+		board.append(row)
+
+	board[size-1][size-1] = 0
+
+	return board
+
 # Possible heuristics: Hamming distance, Manhattan Distance
 def ManhattanDistance(board):
+	''' ManhattanDistance
+
+		Calculates the Manhattan distance from the current board to the solved
+		board state
+	'''
 	pass
 
 def SolveAStar(board, heuristic, verbosity):
@@ -41,14 +90,9 @@ def SolveAStar(board, heuristic, verbosity):
 
 
 # Create globals
+#               UP      DOWN    LEFT    RIGHT
+movements = [ (-1, 0), (1, 0), (0, -1), (0, 1) ]
 board = []
-objective = []
-movements = {
-	"up": (-1, 0), 
-	"down": (1, 0), 
-	"left": (0, -1), 
-	"right": (0, 1)
-}
 
 # Get input
 # If a filename was supplied, dont ask for input
@@ -87,29 +131,28 @@ if args.filename:
 # No file supplied, ask for input from user
 else:
 
-	size = input("Board size: ")
+	size = int(input("Board size: "))
 
-	for i in range(0, len(lines)):
+	for i in range(0, size):
 		line = str(input("Enter board " + str(i) + " row: "))
 	
 		# Split line by spaces and create an array with all digit values
 		board.append([int(s) for s in line.split() if s.isdigit()])
 
-	# print("Board size: " + str(size))
-
-	# print("\nBoard:")
-	# for row in board:
-	# 	print("\t" + str(row))
 
 # Main
+objective = GenerateObjective(size)
+
 
 # Only show board if user asked
 if args.verbosity or args.verbosity2:
+	print("\nBoard:")
 	PrintBoard(board)
-
-# board = SolveIDAStar(board, ManhattanDistance, args.verbosity2)
-# PrintBoard()
-# print("Execution time: " + time)
+	print("\nObjective:")
+	PrintBoard(objective)
 
 
-
+start_time = time.time()
+SolveAStar(board, ManhattanDistance, args.verbosity2)
+PrintBoard(board)
+print("Execution time: %s" % (time.time() - start_time))
