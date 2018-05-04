@@ -85,7 +85,6 @@ def ScrambleBoard(board):
 	return board
 		
 
-
 def PrintBoard(board):
 	for row in board:
 		print("\t" + str(row))
@@ -106,9 +105,12 @@ board = ScrambleBoard(board)
 # print()
 PrintBoard(board)
 
-
-file.writelines(args.n.join("\n"))
+foo = args.n + "\n"
+file.write(foo)
 for row in board:
-	file.writelines(str(row).join("\n"))
+	for value in row:
+		file.write(str(value) + " ")
+	file.write("\n")
+
 
 file.close()
