@@ -26,6 +26,13 @@ def PrintBoard(board):
 	for row in board:
 		print("\t" + str(row))
 
+# Possible heuristics: Hamming distance, Manhattan Distance
+def ManhattanDistance(board):
+	pass
+
+def SolveAStar(board, heuristic, verbosity):
+	pass
+
 
 # Create globals
 board = []
@@ -93,7 +100,7 @@ else:
 if args.verbosity or args.verbosity2:
 	PrintBoard(board)
 
-# board = solve(board, args.verbosity2)
+# board = SolveIDAStar(board, ManhattanDistance, args.verbosity2)
 # PrintBoard()
 
 
