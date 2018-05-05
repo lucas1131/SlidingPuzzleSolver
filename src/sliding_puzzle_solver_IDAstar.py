@@ -10,7 +10,7 @@
 # Otávio Luis Aguiar                    9293518
 # Rafael Augusto Monteiro               9293095
 
-''' Python n² sliding puzzle solver using A*
+''' Python n² sliding puzzle solver using IDA*
 
 	For board creation, the value 0 is considered to be the empty space
 	the board will have size n^2
@@ -45,13 +45,13 @@ def PrintBoard(board):
 		print("\t" + str(row))
 
 def SwapTiles(board, tile1, tile2):
-	''' SwapTiles
+	''' 
+	Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
 
+    Parameters:
 		board: the board's matrix to swap values
 		tile1: a tuple with the coordinates of the first value
 		tile12: a tuple with the coordinates of the second value
-
-		Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
 	'''
 
 	# Swap values
@@ -76,22 +76,93 @@ def GenerateObjective(n):
 
 	return board
 
-# Possible heuristics: Hamming distance, Manhattan Distance
+def Heuristic(board, heuristic_func, normal_func):
+    """
+    Template function that apply the given heuristic for each tile and a 
+    normalization for the total calculated cost.
+    
+    Parameters:
+	    board: puzzle's board
+	    heuristic_func: takes 2 tuples as parameters: current row and col, 
+	    	target row and col
+	    normal_func: takes 1 parameter, the sum of heuristic_func over all 
+	    	entries, and returns int. This is the final value of the heuristic 
+	    	function
+    """
+
+    size = len(board)
+    cost = 0
+    
+    for row in range(size):
+        for col in range(size):
+            
+            val = board[row][col] - 1 # Subtract 1 just for simples arithmetics
+            target = (val/size, val%size)
+
+            # 0's position is last row, last col
+            if target[0] < 0: 
+                target[0] = size-1
+
+            cost += heuristic_func((row, col), target)
+
+	return normal_func(cost)
+
+# Possible heuristics: Hamming distance, Manhattan Distance, Euclidean Distance
 def ManhattanDistance(board):
-	''' ManhattanDistance
-
-		Calculates the Manhattan distance from the current board to the solved
-		board state
+	''' 
+	Calculates the Manhattan distance from the current board to the solved board state
+    Parameters:
+    	board: puzzle's board
 	'''
-	pass
+	return Heuristic(board, 
+		lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
+		lambda cost: cost)
 
-def SolveAStar(board, heuristic, verbosity):
+
+def GetMoves(board):
+
+    """Returns list of tuples with which the free space may
+    be swapped"""
+
+    # Find 0 position
+    size = len(board)
+    pos0 = (-1, -1)
+    for row in range(size):
+        for col in range(size):
+            if board[row][col] == 0:
+            	pos0 = (row, col)
+
+    if pos0[0] < 0 or pos0[1] < 0:
+    	raise Exception("0 space not found!")
+    
+    free = []
+    
+    if pos0[0] > 0:
+        free.append((pos0[0]-1, pos0[1])) # Up
+    if pos0[0] < size-1:
+        free.append((pos0[0]+1, pos0[1])) # Down
+    if pos0[1] > 0:
+        free.append((pos0[0], pos0[1]-1)) # Left
+    if pos0[1] < size-1:
+        free.append((pos0[0], pos0[1]+1)) # Right
+
+	return free
+
+# Used for checking if board has been solved
+objective = GenerateObjective(size)
+def SolveIDAStar(board, heuristic=ManhattanDistance, verbosity=False):
+	'''
+	Solves the puzzle using A* search algorithm with given heuristic
+
+	Parameters:
+		board: puzzle's board
+		heuristic: heuristic function to use
+		verbosity: if true, print each iteration of the algorithm
+	'''
 	pass
 
 
 # Create globals
-#               UP      DOWN    LEFT    RIGHT
-movements = [ (-1, 0), (1, 0), (0, -1), (0, 1) ]
 board = []
 
 # Get input
@@ -141,9 +212,6 @@ else:
 
 
 # Main
-objective = GenerateObjective(size)
-
-
 # Only show board if user asked
 if args.verbosity or args.verbosity2:
 	print("\nBoard:")
@@ -153,6 +221,12 @@ if args.verbosity or args.verbosity2:
 
 
 start_time = time.time()
-SolveIDAStar(board, ManhattanDistance, args.verbosity2)
-PrintBoard(board)
-print("Execution time: %s" % (time.time() - start_time))
+solved, steps = SolveIDAStar(board, ManhattanDistance, args.verbosity2)
+
+if steps < 0:
+	print("No solution found.")
+
+else: 
+	print("Solution found after %s steps." % steps)
+	PrintBoard(solved)
+	print("Execution time: %ss." % (time.time() - start_time))

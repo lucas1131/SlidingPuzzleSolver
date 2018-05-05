@@ -45,13 +45,13 @@ def PrintBoard(board):
 		print("\t" + str(row))
 
 def SwapTiles(board, tile1, tile2):
-	''' SwapTiles
+	''' 
+	Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
 
+    Parameters:
 		board: the board's matrix to swap values
 		tile1: a tuple with the coordinates of the first value
 		tile12: a tuple with the coordinates of the second value
-
-		Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
 	'''
 
 	# Swap values
@@ -76,22 +76,163 @@ def GenerateObjective(n):
 
 	return board
 
-# Possible heuristics: Hamming distance, Manhattan Distance
+def Heuristic(board, heuristic_func, normal_func):
+    """
+    Template function that apply the given heuristic for each tile and a 
+    normalization for the total calculated cost.
+    
+    Parameters:
+	    board: puzzle's board
+	    heuristic_func: takes 2 tuples as parameters: current row and col, 
+	    	target row and col
+	    normal_func: takes 1 parameter, the sum of heuristic_func over all 
+	    	entries, and returns int. This is the final value of the heuristic 
+	    	function
+    """
+
+    size = len(board)
+    cost = 0
+    
+    for row in range(size):
+        for col in range(size):
+            
+            val = board[row][col] - 1 # Subtract 1 just for simples arithmetics
+            target = (val/size, val%size)
+
+            # 0's position is last row, last col
+            if target[0] < 0: 
+                target[0] = size-1
+
+            cost += heuristic_func((row, col), target)
+
+	return normal_func(cost)
+
+# Possible heuristics: Hamming distance, Manhattan Distance, Euclidean Distance
 def ManhattanDistance(board):
-	''' ManhattanDistance
-
-		Calculates the Manhattan distance from the current board to the solved
-		board state
+	''' 
+	Calculates the Manhattan distance from the current board to the solved board state
+    Parameters:
+    	board: puzzle's board
 	'''
-	pass
+	return Heuristic(board, 
+		lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
+		lambda cost: cost)
 
-def SolveAStar(board, heuristic, verbosity):
-	pass
+
+def GetMoves(board):
+
+    """Returns list of tuples with which the free space may
+    be swapped"""
+
+    # Find 0 position
+    size = len(board)
+    pos0 = (-1, -1)
+    for row in range(size):
+        for col in range(size):
+            if board[row][col] == 0:
+            	pos0 = (row, col)
+
+    if pos0[0] < 0 or pos0[1] < 0:
+    	raise Exception("0 space not found!")
+    
+    free = []
+    
+    if pos0[0] > 0:
+        free.append((pos0[0]-1, pos0[1])) # Up
+    if pos0[0] < size-1:
+        free.append((pos0[0]+1, pos0[1])) # Down
+    if pos0[1] > 0:
+        free.append((pos0[0], pos0[1]-1)) # Left
+    if pos0[1] < size-1:
+        free.append((pos0[0], pos0[1]+1)) # Right
+
+	return free
+
+# Used for checking if board has been solved
+objective = GenerateObjective(size)
+def SolveAStar(board, heuristic=ManhattanDistance, verbosity=False):
+	'''
+	Solves the puzzle using A* search algorithm with given heuristic
+
+	Parameters:
+		board: puzzle's board
+		heuristic: heuristic function to use
+		verbosity: if true, print each iteration of the algorithm
+	'''
+
+	open_set = [board]  # Open set (nodes to visit) - start with initial board
+    closed_set = []    # Closed set (visited nodes)
+    move_count = 0
+
+    while len(open_set) > 0:
+        
+        x = open_set.pop(0)  # Open set can be used as a stack to avoid recursion
+        move_count += 1
+
+        if verbosity:
+        	PrintBoard(x)
+        
+        if x == objective:
+            if len(closed_set) > 0:
+                return x._generate_solution_path([]), move_count
+            else: # This case means the input board was already solved
+                return [x]
+
+        moves = GetMoves(x)
+        idx_open = -1
+        idx_closed = -1
+        
+        for move in moves:
+            
+            if move in open_set:
+            	idx_open = open_set.index(item)
+		    else:
+				idx_open = -1
+
+			if move in closed_set:
+            	closed_set = closed_set.index(item)
+		    else:
+				closed_set = -1
+
+            # Heuristic cost
+            heuristic_cost = heuristic(move)       
+            # Heuristic + real cost (until now)
+            estimated_cost = heuristic_cost + move._depth
+
+            # If node has never been visited
+            if idx_closed == -1 and idx_open == -1:
+                move._hval = heuristic_cost
+                open_set.append(move)
+        
+        	# If node is in open set, we can visit it
+            elif idx_open > -1:
+                copy = open_set[idx_open]
+                if estimated_cost < copy._hval + copy._depth:
+                    # copy move's values over existing
+                    copy._hval = heuristic_cost
+                    copy._parent = move._parent
+                    copy._depth = move._depth
+        
+        	# Node is in closed set, we already visited
+            elif idx_closed > -1:
+                copy = closed_set[idx_closed]
+                if estimated_cost < copy._hval + copy._depth:
+                    move._hval = heuristic_cost
+                    closed_set.remove(copy)
+                    open_set.append(board) - start with initial board
+
+        # Add current node to closed (visited) set
+        closed_set.append(x)
+
+        # Sort open set by estimated cost to objective + real cost up to now
+        # This is a priority queue (heap)
+        open_set = sorted(open_set, key=lambda p: p._hval + p._depth)
+
+    # If finished state not found, return failure
+	return [], -1
 
 
 # Create globals
-#               UP      DOWN    LEFT    RIGHT
-movements = [ (-1, 0), (1, 0), (0, -1), (0, 1) ]
 board = []
 
 # Get input
@@ -141,9 +282,6 @@ else:
 
 
 # Main
-objective = GenerateObjective(size)
-
-
 # Only show board if user asked
 if args.verbosity or args.verbosity2:
 	print("\nBoard:")
@@ -153,6 +291,12 @@ if args.verbosity or args.verbosity2:
 
 
 start_time = time.time()
-SolveAStar(board, ManhattanDistance, args.verbosity2)
-PrintBoard(board)
-print("Execution time: %s" % (time.time() - start_time))
+solved, steps = SolveAStar(board, ManhattanDistance, args.verbosity2)
+
+if steps < 0:
+	print("No solution found.")
+
+else: 
+	print("Solution found after %s steps." % steps)
+	PrintBoard(solved)
+	print("Execution time: %ss." % (time.time() - start_time))
