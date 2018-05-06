@@ -19,7 +19,9 @@
 
 import argparse
 import time
-from copy import deepcopy
+import numpy as np
+from queue import PriorityQueue
+import heapq
 
 # Prepare program arguments
 parser = argparse.ArgumentParser()
@@ -38,12 +40,18 @@ parser.add_argument("-vv", "--verbosity2",
 	help="Verbosity level 2 (implies -v; print board after each movement)",
 	action="store_true")
 
+# For debugging
+parser.add_argument("-s", "--step", 
+	help="Run algorithm step by step",
+	action="store_true")
+
 args = parser.parse_args()
 
 # Define functions
 def PrintBoard(board):
-	for row in board:
-		print("\t" + str(row))
+	print(np.matrix(board))
+	# for row in board:
+	# 	print("\t" + str(row))
 
 def SwapTiles(board, tile1, tile2):
 	''' 
@@ -55,10 +63,16 @@ def SwapTiles(board, tile1, tile2):
 		tile12: a tuple with the coordinates of the second value
 	'''
 
+	# Slow - using python list of lists
 	# Swap values
-	tmp = board[tile1[0]][tile1[1]]
-	board[tile1[0]][tile1[1]] = board[tile2[0]][tile2[1]]
-	board[tile2[0]][tile2[1]] = tmp
+	# tmp = board[tile1[0]][tile1[1]]
+	# board[tile1[0]][tile1[1]] = board[tile2[0]][tile2[1]]
+	# board[tile2[0]][tile2[1]] = tmp
+
+	# Using numpy matrix
+	tmp = board[tile1[0], tile1[1]]
+	board[tile1[0], tile1[1]] = board[tile2[0], tile2[1]]
+	board[tile2[0], tile2[1]] = tmp
 
 	return board
 
@@ -93,20 +107,21 @@ def Heuristic(board, heuristic_func, normal_func):
 			function
 	"""
 
-	size = len(board)
+	size = board.shape[0]
 	cost = 0
-	
+
 	for row in range(size):
 		for col in range(size):
 			
-			val = board[row][col] - 1 # Subtract 1 just for simples arithmetics
-			target = (val/size, val%size)
+			val = board[row, col] - 1 # Subtract 1 just for simples arithmetics
+			target = (int(val/size), val%size)
 
 			# 0's position is last row, last col
-			if target[0] < 0: 
+			if val < 0: 
 				target = (size-1, target[1])
 
-			cost += heuristic_func((row, col), target)
+			dist = heuristic_func((row, col), target)
+			cost += dist
 
 	return normal_func(cost)
 
@@ -117,20 +132,21 @@ def ManhattanDistance(board):
 	Parameters:
 		board: puzzle's board
 	'''
-	return Heuristic(board, 
-		lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
-		lambda cost: cost)
+	return Heuristic(board,
+                lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
+                lambda x : x)
+
 
 def GetMoves(board, depth):
 
 	"""Returns list of tuples with the board after the movement and its depth"""
 	
 	# Find 0 position
-	size = len(board)
+	size = board.shape[0]
 	pos0 = (-1, -1)
 	for row in range(size):
 		for col in range(size):
-			if board[row][col] == 0:
+			if board[row, col] == 0:
 				pos0 = (row, col)
 
 
@@ -141,27 +157,27 @@ def GetMoves(board, depth):
 	# Generate and apply possible moves
 	if pos0[0] > 0:
 		move = (pos0[0]-1, pos0[1]) # Up
-		copy = deepcopy(board)
+		copy = board.copy()
 		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
 		
 	if pos0[0] < size-1:
 		move = (pos0[0]+1, pos0[1]) # Down
-		copy = deepcopy(board)
+		copy = board.copy()
 		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
 		
 	if pos0[1] > 0:
 		move = (pos0[0], pos0[1]-1) # Left
-		copy = deepcopy(board)
+		copy = board.copy()
 		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
 		
 	if pos0[1] < size-1:
 		move = (pos0[0], pos0[1]+1) # Right
-		copy = deepcopy(board)
+		copy = board.copy()
 		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
 	
 	return new_boards
 
-def SolveAStar(board, heuristic=ManhattanDistance, verbosity=False):
+def SolveAStar(board, heuristic=ManhattanDistance, verbosity=False, debug=False):
 	'''
 	Solves the puzzle using A* search algorithm with given heuristic
 
@@ -171,88 +187,101 @@ def SolveAStar(board, heuristic=ManhattanDistance, verbosity=False):
 		verbosity: if true, print each iteration of the algorithm
 	'''
 
-	open_set = [ (board, 0) ]  # Open set (to visit) - start with initial board
-	closed_set = []            # Closed set (visited nodes)
+	if not isinstance(board, np.matrix):
+		board = np.matrix(board)
+
+	# Open set (to visit) - start with initial board
+	current_hcost = heuristic(board)
+	open_set = [ (board, 0, current_hcost) ]
+	# Closed set (visited nodes)
+	closed_set = []
 	move_count = 0
 
 	while len(open_set) > 0:
 		
-		x, depth = open_set.pop(0)  # Open set can be used as a stack to avoid recursion
+		# if debug:
+		# 	print("Current open set:")
+		# 	for i in range(len(open_set)):
+		# 		print("\t" + str(open_set[i]))
+
+		# Open set can be used as a stack to avoid recursion
+		current_board, depth, move_hcost = open_set.pop(0)
 		move_count += 1
-
 		
-		if x == objective:
-			if len(closed_set) > 0:
-				# return x._generate_solution_path([]), move_count
-				return x, move_count
-			else: # This case means the input board was already solved
-				return [x], 0
+		# if move_count > 1000:
+		# 	return [], -1 # failure
 
-		moves = GetMoves(x, depth)
-		print(moves)
+		if np.array_equal(current_board, objective):
+			if len(closed_set) > 0:
+				return current_board, move_count
+			else: # This case means the input board was already solved
+				return [current_board], 0
+
+		moves = GetMoves(current_board, depth)
 		idx_open = -1
 		idx_closed = -1
 		
+		# if move_count%100 == 0:
+		if verbosity: 
+			print("\n Iteration %s" % move_count)
+			print(" Depth: %s" % depth)
+			PrintBoard(current_board)
+		if debug:
+			input()
+
 		for move, depth in moves:
-			if verbosity:
-				print("\n  Depth: %s" % depth)
-				PrintBoard(move)
 
-			print("\nopen")
-			print(type(open_set))
-			print(open_set)
-
-			print("\nclosed")
-			print(type(closed_set))
-			print(closed_set)
+			# Heuristic cost
+			move_hcost = heuristic(move)
 
 			if move in open_set:
-				idx_open = open_set.index(item)
+				idx_open = open_set.index(move, depth, move_hcost)
 			else:
 				idx_open = -1
 			
 			if move in closed_set:
-				idx_closed = closed_set.index(item)
+				idx_closed = closed_set.index(move, depth, move_hcost)
 			else:
 				idx_closed = -1
 
-			# Heuristic cost
-			heuristic_cost = heuristic(move)
 			# Heuristic + real cost (until now)
-			estimated_cost = heuristic_cost + depth
+			estimated_cost = move_hcost + depth
+			if debug and move_count%100 == 0:
+				print("\n\t")
+				PrintBoard(move)
+				print("\tHeuristic cost: " + str(move_hcost))
+				print("\tMove's real cost: " + str(depth))
+				print("\tTotal estimated cost: " + str(estimated_cost))
 
 			# If node has never been visited
 			if idx_closed == -1 and idx_open == -1:
-				print("Adding new node to open set")
-				open_set.append( (move, depth) )
+				# open_set.append( (move_hcost, (move, depth)) )
+				open_set.append((move, depth, move_hcost))
 		
 			# If node is in open set, we can update its entry for future visit
 			elif idx_open > -1:
-				print("updating node in open set")
 				cp, cp_depth = open_set[idx_open]
-				cp_hcost = heuristic(cp)
 				
-				if estimated_cost < copy_hcost + cp_depth:
+				if depth < cp_depth:
 					# Copy move's values over existing
-					cp._hval = heuristic_cost
-					cp._depth = depth
+					cp_depth = depth
 		
 			# Node is in closed set, we already visited
 			elif idx_closed > -1:
-				print("node is in closed set, already visited")
 				cp, cp_depth = closed_set[idx_closed]
-				cp_hcost = heuristic(cp)
 				
-				if estimated_cost < cp_hcost + cp_depth:
-					closed_set.remove( (cp, depth) )
-					open_set.append( (board, depth) )
+				if depth < cp_depth:
+					closed_set = [i for i in closed_set if i[0] == cp]
+					# closed_set.remove( (cp, cp_depth) )
+					# open_set.append( (move, depth, move_hcost) )
 
 		# Add current node to closed (visited) set
-		closed_set.append( (x, depth) )
+		# closed_set.append( (current_board, depth, current_hcost) )
+		closed_set.append((current_board, depth, current_hcost))
 
 		# Sort open set by estimated cost to objective + real cost up to now
 		# This is a priority queue (heap)
-		open_set = sorted(open_set, key=lambda pair: heuristic(pair[0]) + pair[1])
+		open_set = sorted(open_set, key=lambda pair: pair[2] + pair[1])
 
 	# If finished state not found, return failure
 	return [], -1
@@ -310,7 +339,7 @@ else:
 # Main
 # Used for checking if board has been solved
 global objective
-objective = GenerateObjective(size)
+objective = np.matrix(GenerateObjective(size))
 
 # Only show board if user asked
 # if args.verbosity or args.verbosity2:
@@ -319,9 +348,10 @@ objective = GenerateObjective(size)
 	# print("\nObjective:")
 	# PrintBoard(objective)
 
-
+# exit
 start_time = time.time()
-solved, steps = SolveAStar(board, ManhattanDistance, args.verbosity2)
+
+solved, steps = SolveAStar(board, ManhattanDistance, args.verbosity2, args.step)
 
 if steps < 0:
 	print("No solution found.")
