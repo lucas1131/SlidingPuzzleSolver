@@ -12,354 +12,460 @@
 
 ''' Python n² sliding puzzle solver using A*
 
-	For board creation, the value 0 is considered to be the empty space
-	the board will have size n^2
+    For board creation, the value 0 is considered to be the empty space
+    the board will have size n^2
 
 '''
 
 import argparse
 import time
-import numpy as np
-from queue import PriorityQueue
 import heapq
 
 # Prepare program arguments
 parser = argparse.ArgumentParser()
 
 ''' Arguments:
-	FILENAME    name of the file to read the input from
-	VERBOSITY   show some more info
-	FILENAME    name of the file to read the input from
+    FILENAME    name of the file to read the input from
+    VERBOSITY   show some more info
+    FILENAME    name of the file to read the input from
 '''
 
 parser.add_argument("-f", "--filename", help="File with input board")
 parser.add_argument("-v", "--verbosity", 
-	help="Verbosity level 1 (print initial board)",
-	action="store_true")
+    help="Verbosity level 1 (print initial board)",
+    action="store_true")
 parser.add_argument("-vv", "--verbosity2", 
-	help="Verbosity level 2 (implies -v; print board after each movement)",
-	action="store_true")
+    help="Verbosity level 2 (implies -v; print board after each movement)",
+    action="store_true")
 
 # For debugging
 parser.add_argument("-s", "--step", 
-	help="Run algorithm step by step",
-	action="store_true")
+    help="Run algorithm step by step",
+    action="store_true")
 
 args = parser.parse_args()
 
-# Define functions
-def PrintBoard(board):
-	print(np.matrix(board))
-	# for row in board:
-	# 	print("\t" + str(row))
 
-def SwapTiles(board, tile1, tile2):
-	''' 
-	Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
+class SlidingPuzzle:
+    
+    # Used for checking if board has been solved
+    objective = None
+    _objective_created = False
 
-	Parameters:
-		board: the board's matrix to swap values
-		tile1: a tuple with the coordinates of the first value
-		tile12: a tuple with the coordinates of the second value
-	'''
+    def __init__(self, board, pos0=-1, n=-1):
 
-	# Slow - using python list of lists
-	# Swap values
-	# tmp = board[tile1[0]][tile1[1]]
-	# board[tile1[0]][tile1[1]] = board[tile2[0]][tile2[1]]
-	# board[tile2[0]][tile2[1]] = tmp
+        if n == -1: n = len(board)
 
-	# Using numpy matrix
-	tmp = board[tile1[0], tile1[1]]
-	board[tile1[0], tile1[1]] = board[tile2[0], tile2[1]]
-	board[tile2[0], tile2[1]] = tmp
+        # If board is a list of list, transform to a single list
+        if isinstance(board[0], list):
+            n2 = n*n
+            _board = list(range(0, n2))
+            j = 0
+            for i in range(0, n2, n):
+                _board[i:i+n] = board[j]
+                j += 1
+        
+        else: _board = list(board)
+            
 
-	return board
+        self._heuristic_cost = 0
+        self._real_cost = 0
+        self.size = n
+        self.board = _board
+        
+        # Parent node in search path
+        self._parent = None
+
+        # Quick access to 0 position
+        if pos0 == -1: self._pos0 = self._find_zero()
+        else: self._pos0 = pos0
+
+        if not SlidingPuzzle._objective_created:
+            SlidingPuzzle._objective_created = True
+            SlidingPuzzle.objective = SlidingPuzzle(GenerateObjective(self.size))
+
+    def __eq__(self, other):
+        if self.__class__ != other.__class__: return False
+        else: return self.board == other.board
+
+    def __ne__(self, other):
+        if self.__class__ != other.__class__: return False
+        else: return not self.board == other.board
+
+    def __lt__(self, other):
+        if self.__class__ != other.__class__: return False
+        else: 
+            this_cost = self._real_cost + self._heuristic_cost
+            that_cost = other._real_cost + other._heuristic_cost
+            return this_cost < that_cost
+
+    def __le__(self, other):
+        if self.__class__ != other.__class__: return False
+        else: 
+            this_cost = self._real_cost + self._heuristic_cost 
+            that_cost = other._real_cost + other._heuristic_cost
+            return this_cost <= that_cost
+
+    def __gt__(self, other):
+        if self.__class__ != other.__class__: return False
+        else: 
+            this_cost = self._real_cost + self._heuristic_cost
+            that_cost = other._real_cost + other._heuristic_cost
+            return this_cost > that_cost
+
+    def __ge__(self, other):
+        if self.__class__ != other.__class__: return False
+        else: 
+            this_cost = self._real_cost + self._heuristic_cost 
+            that_cost = other._real_cost + other._heuristic_cost
+            return this_cost >= that_cost
+
+    def __str__(self):
+        res = ""
+        i = 0
+        for value in self.board:
+            res += "%-2s " % value
+            i += 1
+            if i%self.size == 0:
+                res += "\r\n"
+
+        return res
+
+    def __getitem__(self, index):
+        x, y = index
+        return self.board[x*self.size + y]
+
+    def _find_zero(self):
+
+        # Find 0 position
+        pos0 = (-1, -1)
+        for row in range(self.size):
+            for col in range(self.size):
+                if self[row, col] == 0:
+                    pos0 = (row, col)
+
+        if pos0[0] < 0: raise Exception("0 space not found!")
+        else:
+            self._pos0 = pos0
+            return self._pos0
+
+    def Clone(self): 
+        copy = SlidingPuzzle(self.board, n=self.size, pos0=self._pos0)
+        
+        copy._heuristic_cost = self._heuristic_cost
+        copy._real_cost = self._real_cost
+        copy._parent = self._parent
+
+        return copy
+
+    def Swap(self, tile1, tile2):
+        ''' 
+        Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
+
+        Parameters:
+            tile1: a tuple with the coordinates of the first value
+            tile12: a tuple with the coordinates of the second value
+        '''
+        p1 = tile1[0]*self.size + tile1[1]
+        p2 = tile2[0]*self.size + tile2[1]
+
+        tmp = self.board[p1]
+        self.board[p1] = self.board[p2]
+        self.board[p2] = tmp
+
+        # Increment cost
+        self._real_cost += 1
+        self._hash_up_to_date = False
+
+        if self[tile1[0], tile1[1]] == 0: self._pos0 = tile1
+        elif self[tile2[0], tile2[1]] == 0: self._pos0 = tile2
+
+    def GetMoves(self):
+
+        """Returns list of tuples with the board after the movement and its depth"""
+        
+        new_boards = []
+        # Generate and apply possible moves
+        if self._pos0[0] > 0:
+            move = (self._pos0[0]-1, self._pos0[1]) # Up
+            copy = self.Clone()
+            copy.Swap(self._pos0, move)
+            copy._parent = self
+            new_boards.append(copy)
+            
+        if self._pos0[0] < self.size-1:
+            move = (self._pos0[0]+1, self._pos0[1]) # Down
+            copy = self.Clone()
+            copy.Swap(self._pos0, move)
+            copy._parent = self
+            new_boards.append(copy)
+            
+        if self._pos0[1] > 0:
+            move = (self._pos0[0], self._pos0[1]-1) # Left
+            copy = self.Clone()
+            copy.Swap(self._pos0, move)
+            copy._parent = self
+            new_boards.append(copy)
+            
+        if self._pos0[1] < self.size-1:
+            move = (self._pos0[0], self._pos0[1]+1) # Right
+            copy = self.Clone()
+            copy.Swap(self._pos0, move)
+            copy._parent = self
+            new_boards.append(copy)
+        
+        return new_boards
+
+    def Solve(self, heuristic, verbosity=False, debug=False):
+        '''
+        Solves the puzzle using A* search algorithm with given heuristic
+
+        Parameters:
+            self: puzzle's self
+            heuristic: heuristic function to use
+            verbosity: if true, print each iteration of the algorithm
+        '''
+
+        # Open set (to visit) - start with initial self
+        # open_set = PriorityQueue()
+        # open_set.put(self)
+        open_set = [self]
+
+        # Closed set (visited nodes)
+        closed_set = []
+        move_count = 0
+
+        # while not open_set.empty():
+        while len(open_set) > 0:
+            # Open set can be used as a stack to avoid recursion
+            # current_board = open_set.get()
+            current_board = heapq.heappop(open_set)
+
+            # Puzzle is done!
+            if current_board == SlidingPuzzle.objective:
+                return current_board._get_path([]), move_count
+
+            moves = current_board.GetMoves()
+            move_count += 1
+            idx_open = -1
+            idx_closed = -1
+            
+            # if move_count%100 == 0:
+            if verbosity: 
+                print("\n Iteration %s" % move_count)
+                print(" Depth: %s" % current_board._real_cost)
+                print(current_board)
+            if debug:
+                input()
+
+            for move in moves:
+
+
+                try:
+                    idx_open = open_set.index(move)
+                except:
+                    idx_open = -1
+
+                try:
+                    idx_closed = closed_set.index(move)
+                except:
+                    idx_closed = -1
+
+                # Heuristic cost
+                heuristic_cost = heuristic(move)
+                # Heuristic + real cost (until now)
+                estimated_cost = move._heuristic_cost + move._real_cost
+                
+                # If node has never been visited
+                if idx_closed == -1 and idx_open == -1:
+                    move._heuristic_cost = heuristic_cost
+                    heapq.heappush(open_set, move)
+
+                # If node is in open set, we can update its entry for future visit
+                elif idx_open > -1:
+                    copy = open_set[idx_open]
+                    if estimated_cost < copy._heuristic_cost + copy._real_cost:
+                        # copy move's values over existing
+                        copy._heuristic_cost = heuristic_cost
+                        copy._parent = move._parent
+                        copy._real_cost = move._real_cost
+
+                # Node is in closed set, we already visited
+                elif idx_closed > -1:
+                    copy = closed_set[idx_closed]
+                    if estimated_cost < copy._heuristic_cost + copy._real_cost:
+                        move._heuristic_cost = heuristic_cost
+                        closed_set.remove(copy)
+                        heapq.heappush(open_set, move)
+
+                if debug:
+                    print(move)
+
+            closed_set.append(current_board)
+
+        # If finished state not found, return failure
+        return [], -1
+
+    def _get_path(self, path):
+        if self._parent == None:
+            return path
+        else:
+            path.append(self)
+            return self._parent._get_path(path)
 
 def GenerateObjective(n):
 
-	board = []
-	count = 0
-	
-	for i in range(0, size):
+    board = []
+    count = 0
+    
+    for i in range(0, n):
 
-		row = []
-		for j in range(0, size):
-			count += 1
-			row.append(count)
-		board.append(row)
+        row = []
+        for j in range(0, n):
+            count += 1
+            row.append(count)
+        board.append(row)
 
-	board[size-1][size-1] = 0
+    board[n-1][n-1] = 0
 
-	return board
+    return board
 
-def Heuristic(board, heuristic_func, normal_func):
-	"""
-	Template function that apply the given heuristic for each tile and a 
-	normalization for the total calculated cost.
-	
-	Parameters:
-		board: puzzle's board
-		heuristic_func: takes 2 tuples as parameters: current row and col, 
-			target row and col
-		normal_func: takes 1 parameter, the sum of heuristic_func over all 
-			entries, and returns int. This is the final value of the heuristic 
-			function
-	"""
+# Slow
+def Heuristic(puzzle, heuristic_func, normal_func):
+    """
+    Template function that apply the given heuristic for each tile and a 
+    normalization for the total calculated cost.
+    
+    Parameters:
+        puzzle: puzzle's puzzle
+        heuristic_func: takes 2 tuples as parameters: current row and col, 
+            target row and col
+        normal_func: takes 1 parameter, the sum of heuristic_func over all 
+            entries, and returns int. This is the final value of the heuristic 
+            function
+    """
 
-	size = board.shape[0]
-	cost = 0
+    cost = 0
 
-	for row in range(size):
-		for col in range(size):
-			
-			val = board[row, col] - 1 # Subtract 1 just for simples arithmetics
-			target = (int(val/size), val%size)
+    for row in range(puzzle.size):
+        for col in range(puzzle.size):
+            val = puzzle[row, col] - 1 # Subtract 1 just for simpler arithmetics
+            target = (int(val/puzzle.size), val%puzzle.size)
 
-			# 0's position is last row, last col
-			if val < 0: 
-				target = (size-1, target[1])
+            # 0's position is last row, last col
+            if val < 0: 
+                target = (puzzle.size-1, target[1])
 
-			dist = heuristic_func((row, col), target)
-			cost += dist
+            dist = heuristic_func((row, col), target)
+            cost += dist
 
-	return normal_func(cost)
+    return normal_func(cost)
 
 # Possible heuristics: Hamming distance, Manhattan Distance, Euclidean Distance
-def ManhattanDistance(board):
-	''' 
-	Calculates the Manhattan distance from the current board to the solved board state
-	Parameters:
-		board: puzzle's board
-	'''
-	return Heuristic(board,
-                lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
-                lambda x : x)
+def ManhattanDistance(puzzle):
+    ''' 
+    Calculates the Manhattan distance from the current puzzle to the solved puzzle state
+    Parameters:
+        puzzle: puzzle's puzzle
+    '''
+    cost = 0
+
+    for row in range(puzzle.size):
+        for col in range(puzzle.size):
+            val = puzzle[row, col] - 1 # Subtract 1 just for simpler arithmetics
+            target = (int(val/puzzle.size), val%puzzle.size)
+
+            # 0's position is last row, last col
+            if val < 0: 
+                target = (puzzle.size-1, target[1])
+
+            dist = abs(row - target[0]) + abs(col - target[1])
+            cost += dist
+
+    return cost
+
+    # return Heuristic(puzzle,
+    #             lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
+    #             lambda x : x)
 
 
-def GetMoves(board, depth):
+def main():
 
-	"""Returns list of tuples with the board after the movement and its depth"""
-	
-	# Find 0 position
-	size = board.shape[0]
-	pos0 = (-1, -1)
-	for row in range(size):
-		for col in range(size):
-			if board[row, col] == 0:
-				pos0 = (row, col)
+    board = []
 
+    # Get input
+    # If a filename was supplied, dont ask for input
+    if args.filename:
 
-	if pos0[0] < 0 or pos0[1] < 0:
-		raise Exception("0 space not found!")
-	
-	new_boards = []
-	# Generate and apply possible moves
-	if pos0[0] > 0:
-		move = (pos0[0]-1, pos0[1]) # Up
-		copy = board.copy()
-		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
-		
-	if pos0[0] < size-1:
-		move = (pos0[0]+1, pos0[1]) # Down
-		copy = board.copy()
-		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
-		
-	if pos0[1] > 0:
-		move = (pos0[0], pos0[1]-1) # Left
-		copy = board.copy()
-		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
-		
-	if pos0[1] < size-1:
-		move = (pos0[0], pos0[1]+1) # Right
-		copy = board.copy()
-		new_boards.append( (SwapTiles(copy, pos0, move), depth+1) )
-	
-	return new_boards
+        try:
+            file = open(args.filename, "r")
+        except:
+            print("Error: file not found.")
+            raise
 
-def SolveAStar(board, heuristic=ManhattanDistance, verbosity=False, debug=False):
-	'''
-	Solves the puzzle using A* search algorithm with given heuristic
+        lines = file.readlines();
 
-	Parameters:
-		board: puzzle's board
-		heuristic: heuristic function to use
-		verbosity: if true, print each iteration of the algorithm
-	'''
+        try:
+            size = int(lines[0]) # Board size
 
-	if not isinstance(board, np.matrix):
-		board = np.matrix(board)
+            # Get board values
+            for i in range(1, len(lines)):
+                line = lines[i]
 
-	# Open set (to visit) - start with initial board
-	open_set = [ (heuristic(board), (board, 0)) ]
-	# Closed set (visited nodes)
-	closed_set = []
-	move_count = 0
+                # Split line by spaces and create an array with all digit values
+                board.append([int(s) for s in line.split() if s.isdigit()])
 
-	while len(open_set) > 0:
-		
-		# if debug:
-		# 	print("Current open set:")
-		# 	for i in range(len(open_set)):
-		# 		print("\t" + str(open_set[i]))
+                # If any line length is different than supplied board size, error
+                if len(board[i-1]) != size:
+                    raise Exception("Non conforming board shape (is the board squared?)")
 
-		# Open set can be used as a stack to avoid recursion
-		current_board, depth = heapq.heappop(open_set)[1]
-		move_count += 1
-		
-		# if move_count > 1000:
-		# 	return [], -1 # failure
+            # If the number of lines is different than supplied board size, error
+            if len(board) != size:
+                raise Exception("Non conforming board shape (is the board squared?)")
 
-		if np.array_equal(current_board, objective):
-			if len(closed_set) > 0:
-				return current_board, move_count
-			else: # This case means the input board was already solved
-				return [current_board], 0
+        except ValueError:
+            print("Error: failed to parse file at line " + i)
 
-		moves = GetMoves(current_board, depth)
-		idx_open = -1
-		idx_closed = -1
-		
-		if move_count%100 == 0:
-			if verbosity: 
-				print("\n Iteration %s" % move_count)
-				print(" Depth: %s" % depth)
-				PrintBoard(current_board)
-			if debug:
-				input()
+    # No file supplied, ask for input from user
+    else:
 
-		for move, depth in moves:
+        size = int(input("Board size: "))
 
-			# Heuristic cost
-			move_hcost = heuristic(move)
+        for i in range(0, size):
+            line = str(input("Enter board " + str(i) + " row: "))
+        
+            # Split line by spaces and create an array with all digit values
+            board.append([int(s) for s in line.split() if s.isdigit()])
 
-			if move in open_set:
-				idx_open = open_set.index((move_hcost+depth, (move, depth)))
-			else:
-				idx_open = -1
-			
-			if move in closed_set:
-				idx_closed = closed_set.index((move_hcost+depth, (move, depth)))
-			else:
-				idx_closed = -1
+    # Only show board if user asked
+    # if args.verbosity or args.verbosity2:
+        # print("\nBoard:")
+        # print(board)
+        # print("\nObjective:")
+        # print(objective)
 
-			# Heuristic + real cost (until now)
-			estimated_cost = move_hcost + depth
-			if debug and move_count%100 == 0:
-				print("\n\t")
-				PrintBoard(move)
-				print("\tHeuristic cost: " + str(move_hcost))
-				print("\tMove's real cost: " + str(depth))
-				print("\tTotal estimated cost: " + str(estimated_cost))
+    puzzle = SlidingPuzzle(board)
 
-			# If node has never been visited
-			if idx_closed == -1 and idx_open == -1:
-				# open_set.append( (move_hcost, (move, depth)) )
-				print(type(move_hcost))
-				print(type(depth))
-				print(type(move))
-				print(type((move, depth)))
-				heapq.heappush(open_set, (move_hcost+depth, (move, depth)) )
-		
-			# If node is in open set, we can update its entry for future visit
-			elif idx_open > -1:
-				cp, cp_depth = open_set[idx_open][1]
-				
-				if depth < cp_depth:
-					# Copy move's values over existing
-					cp_depth = depth
-		
-			# Node is in closed set, we already visited
-			elif idx_closed > -1:
-				cp, cp_depth = closed_set[idx_closed][1]
-				
-				if depth < cp_depth:
-					closed_set = [i for i in closed_set if i[0] == cp]
-					# closed_set.remove( (cp, cp_depth) )
-					# open_set.append( (move, depth, move_hcost) )
+    start_time = time.time()
 
-		# Add current node to closed (visited) set
-		# closed_set.append( (current_board, depth, current_hcost) )
-		heapq.heappush(closed_set, (current_hcost+depth, (current_board, depth) ) )
+    # Here path is returned in reverse order because of recursion
+    path, steps = puzzle.Solve(heuristic=ManhattanDistance, 
+                                verbosity=args.verbosity2, 
+                                debug=args.step)
+    print("Time to solve: %ss." % (time.time() - start_time))
 
-		# Sort open set by estimated cost to objective + real cost up to now
-		# This is a priority queue (heap)
-		# open_set = sorted(open_set, key=lambda pair: pair[2] + pair[1])
+    if steps < 0:
+        print("No solution found.")
 
-	# If finished state not found, return failure
-	return [], -1
+    else: 
+        print("Solution found after %s steps." % steps)
+        print()
 
+        if args.verbosity:
+            print("Steps:")
+            for i in range(len(path)):
+                print(path[-1-i]) # Index from last to first
+        else: print(path[0]) # Only print result
 
-# Create globals
-board = []
-
-# Get input
-# If a filename was supplied, dont ask for input
-if args.filename:
-
-	try:
-		file = open(args.filename, "r")
-	except:
-		print("Error: file not found.")
-		raise
-
-	lines = file.readlines();
-
-	try:
-		size = int(lines[0]) # Board size
-
-		# Get board values
-		for i in range(1, len(lines)):
-			line = lines[i]
-
-			# Split line by spaces and create an array with all digit values
-			board.append([int(s) for s in line.split() if s.isdigit()])
-
-			# If any line length is different than supplied board size, error
-			if len(board[i-1]) != size:
-				raise Exception("Non conforming board shape (is the board squared?)")
-
-		# If the number of lines is different than supplied board size, error
-		if len(board) != size:
-			raise Exception("Non conforming board shape (is the board squared?)")
-
-	except ValueError:
-		print("Error: failed to parse file at line " + i)
-
-
-# No file supplied, ask for input from user
-else:
-
-	size = int(input("Board size: "))
-
-	for i in range(0, size):
-		line = str(input("Enter board " + str(i) + " row: "))
-	
-		# Split line by spaces and create an array with all digit values
-		board.append([int(s) for s in line.split() if s.isdigit()])
-
-
-# Main
-# Used for checking if board has been solved
-global objective
-objective = np.matrix(GenerateObjective(size))
-
-# Only show board if user asked
-# if args.verbosity or args.verbosity2:
-	# print("\nBoard:")
-	# PrintBoard(board)
-	# print("\nObjective:")
-	# PrintBoard(objective)
-
-# exit
-start_time = time.time()
-
-solved, steps = SolveAStar(board, ManhattanDistance, args.verbosity2, args.step)
-
-if steps < 0:
-	print("No solution found.")
-
-else: 
-	print("Solution found after %s steps." % steps)
-	PrintBoard(solved)
-	print("Execution time: %ss." % (time.time() - start_time))
+if __name__ == '__main__':
+    main()
