@@ -1,0 +1,3 @@
+Time to solve: 27.839516162872314s.
+Solution found after 512758 steps.
+Steps: 

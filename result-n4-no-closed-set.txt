@@ -1,0 +1,3 @@
+Time to solve: 25.50260329246521s.
+Solution found after 353364 steps.
+Steps: DDRURULDLURDRRDLLDRUUULDLDRRRULLDRUULL

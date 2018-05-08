@@ -76,6 +76,9 @@ class SlidingPuzzle:
         # Parent node in search path
         self._parent = None
 
+        # Movement that generated this board configuration
+        self._generator_move = ""
+
         # Quick access to 0 position
         if pos0 == -1: self._pos0 = self._find_zero()
         else: self._pos0 = pos0
@@ -135,6 +138,8 @@ class SlidingPuzzle:
         x, y = index
         return self.board[x*self.size + y]
 
+    def __tmp__str__(self): return str(self.board)
+
     def _find_zero(self):
 
         # Find 0 position
@@ -158,7 +163,7 @@ class SlidingPuzzle:
 
         return copy
 
-    def Swap(self, tile1, tile2):
+    def Swap(self, tile1, tile2, generator=""):
         ''' 
         Swaps the values of board[tile1.x, tile1.y] and board[tile2.x, tile2.y]
 
@@ -177,6 +182,8 @@ class SlidingPuzzle:
         self._real_cost += 1
         self._hash_up_to_date = False
 
+        self._generator_move = generator
+
         if self[tile1[0], tile1[1]] == 0: self._pos0 = tile1
         elif self[tile2[0], tile2[1]] == 0: self._pos0 = tile2
 
@@ -186,31 +193,35 @@ class SlidingPuzzle:
         
         new_boards = []
         # Generate and apply possible moves
-        if self._pos0[0] > 0:
+        if self._pos0[0] > 0 and self._generator_move != "D":
+        # if self._pos0[0] > 0:
             move = (self._pos0[0]-1, self._pos0[1]) # Up
             copy = self.Clone()
-            copy.Swap(self._pos0, move)
+            copy.Swap(self._pos0, move, generator="U")
             copy._parent = self
             new_boards.append(copy)
             
-        if self._pos0[0] < self.size-1:
+        if self._pos0[0] < self.size-1 and self._generator_move != "U":
+        # if self._pos0[0] < self.size-1:
             move = (self._pos0[0]+1, self._pos0[1]) # Down
             copy = self.Clone()
-            copy.Swap(self._pos0, move)
+            copy.Swap(self._pos0, move, generator="D")
             copy._parent = self
             new_boards.append(copy)
             
-        if self._pos0[1] > 0:
+        if self._pos0[1] > 0 and self._generator_move != "R":
+        # if self._pos0[1] > 0:
             move = (self._pos0[0], self._pos0[1]-1) # Left
             copy = self.Clone()
-            copy.Swap(self._pos0, move)
+            copy.Swap(self._pos0, move, generator="L")
             copy._parent = self
             new_boards.append(copy)
             
-        if self._pos0[1] < self.size-1:
+        if self._pos0[1] < self.size-1 and self._generator_move != "L":
+        # if self._pos0[1] < self.size-1:
             move = (self._pos0[0], self._pos0[1]+1) # Right
             copy = self.Clone()
-            copy.Swap(self._pos0, move)
+            copy.Swap(self._pos0, move, generator="R")
             copy._parent = self
             new_boards.append(copy)
         
@@ -230,88 +241,53 @@ class SlidingPuzzle:
         # open_set = PriorityQueue()
         # open_set.put(self)
         open_set = [self]
-
-        # Closed set (visited nodes)
-        closed_set = []
         move_count = 0
 
         # while not open_set.empty():
         while len(open_set) > 0:
+            
             # Open set can be used as a stack to avoid recursion
             # current_board = open_set.get()
             current_board = heapq.heappop(open_set)
 
             # Puzzle is done!
             if current_board == SlidingPuzzle.objective:
-                return current_board._get_path([]), move_count
+                return current_board._get_path(), move_count
 
             moves = current_board.GetMoves()
             move_count += 1
             idx_open = -1
             idx_closed = -1
             
-            # if move_count%100 == 0:
             if verbosity: 
                 print("\n Iteration %s" % move_count)
                 print(" Depth: %s" % current_board._real_cost)
                 print(current_board)
-            if debug:
-                input()
+            if debug: input()
 
             for move in moves:
-
-
-                try:
-                    idx_open = open_set.index(move)
-                except:
-                    idx_open = -1
-
-                try:
-                    idx_closed = closed_set.index(move)
-                except:
-                    idx_closed = -1
-
-                # Heuristic cost
                 heuristic_cost = heuristic(move)
-                # Heuristic + real cost (until now)
-                estimated_cost = move._heuristic_cost + move._real_cost
-                
-                # If node has never been visited
-                if idx_closed == -1 and idx_open == -1:
-                    move._heuristic_cost = heuristic_cost
-                    heapq.heappush(open_set, move)
+                move._heuristic_cost = heuristic_cost
+                heapq.heappush(open_set, move)
 
-                # If node is in open set, we can update its entry for future visit
-                elif idx_open > -1:
-                    copy = open_set[idx_open]
-                    if estimated_cost < copy._heuristic_cost + copy._real_cost:
-                        # copy move's values over existing
-                        copy._heuristic_cost = heuristic_cost
-                        copy._parent = move._parent
-                        copy._real_cost = move._real_cost
-
-                # Node is in closed set, we already visited
-                elif idx_closed > -1:
-                    copy = closed_set[idx_closed]
-                    if estimated_cost < copy._heuristic_cost + copy._real_cost:
-                        move._heuristic_cost = heuristic_cost
-                        closed_set.remove(copy)
-                        heapq.heappush(open_set, move)
-
-                if debug:
-                    print(move)
-
-            closed_set.append(current_board)
 
         # If finished state not found, return failure
         return [], -1
 
-    def _get_path(self, path):
-        if self._parent == None:
-            return path
-        else:
-            path.append(self)
-            return self._parent._get_path(path)
+    def _get_path(self):
+
+        aux = self
+        path = ""
+        while aux:
+            path += aux._generator_move
+            aux = aux._parent
+
+        return path
+        # if self._parent == None:
+        #     return path
+        # else:
+        #     path.append(self)
+        #     return self._parent._get_path(path)
 
 def GenerateObjective(n):
 
@@ -329,37 +305,6 @@ def GenerateObjective(n):
     board[n-1][n-1] = 0
 
     return board
-
-# Slow
-def Heuristic(puzzle, heuristic_func, normal_func):
-    """
-    Template function that apply the given heuristic for each tile and a 
-    normalization for the total calculated cost.
-    
-    Parameters:
-        puzzle: puzzle's puzzle
-        heuristic_func: takes 2 tuples as parameters: current row and col, 
-            target row and col
-        normal_func: takes 1 parameter, the sum of heuristic_func over all 
-            entries, and returns int. This is the final value of the heuristic 
-            function
-    """
-
-    cost = 0
-
-    for row in range(puzzle.size):
-        for col in range(puzzle.size):
-            val = puzzle[row, col] - 1 # Subtract 1 just for simpler arithmetics
-            target = (int(val/puzzle.size), val%puzzle.size)
-
-            # 0's position is last row, last col
-            if val < 0: 
-                target = (puzzle.size-1, target[1])
-
-            dist = heuristic_func((row, col), target)
-            cost += dist
-
-    return normal_func(cost)
 
 # Possible heuristics: Hamming distance, Manhattan Distance, Euclidean Distance
 def ManhattanDistance(puzzle):
@@ -383,10 +328,6 @@ def ManhattanDistance(puzzle):
             cost += dist
 
     return cost
-
-    # return Heuristic(puzzle,
-    #             lambda pos, target: abs(pos[0] - target[0]) + abs(pos[1] - target[1]),
-    #             lambda x : x)
 
 
 def main():
@@ -459,13 +400,7 @@ def main():
 
     else: 
         print("Solution found after %s steps." % steps)
-        print()
-
-        if args.verbosity:
-            print("Steps:")
-            for i in range(len(path)):
-                print(path[-1-i]) # Index from last to first
-        else: print(path[0]) # Only print result
+        print("Steps: " + path)
 
 if __name__ == '__main__':
     main()
